@@ -18,10 +18,10 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+// Design: Health (good) #4ade80, (warning) #facc15, (danger) #ef4444
 function getHealthColor(h: number) {
-  if (h > 65) return '#4ade80'
-  if (h > 35) return '#facc15'
-  if (h > 15) return '#f97316'
+  if (h > 60) return '#4ade80'
+  if (h > 30) return '#facc15'
   return '#ef4444'
 }
 

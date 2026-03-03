@@ -27,7 +27,7 @@ export default function App() {
 
   const fallSpeed = isPlaying
     ? getFallSpeed(Date.now() - startTimeRef.current)
-    : 1.5
+    : 0.8
 
   // ── Auto-end ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -64,17 +64,31 @@ export default function App() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: '#050008' }}>
+    <div style={{
+      width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative',
+      background: '#ffffff',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
 
-      {/* ── Full-screen 3D game (always rendered, visible behind overlays) ── */}
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <GameScene
-          health={state.health}
-          stress={state.stress}
-          words={words}
-          fallSpeed={fallSpeed}
-          onWordExit={handleWordExit}
-        />
+      {/* ── Screen within a screen: vertical confined area with bezel ── */}
+      <div style={{
+        width: '72vw',
+        height: '88vh',
+        maxWidth: 1200,
+        maxHeight: '92vh',
+        borderRadius: 8,
+        overflow: 'hidden',
+        boxShadow: '0 40px 120px rgba(0,0,0,0.16)',
+        background: '#ffffff',
+        position: 'relative',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+          <GameScene
+            words={words}
+            fallSpeed={fallSpeed}
+            onWordExit={handleWordExit}
+          />
+        </div>
       </div>
 
       {/* ── HUD overlay (only while playing) ── */}

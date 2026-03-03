@@ -13,6 +13,7 @@ function formatTime(s: number): string {
   return `${m}m ${sec.toString().padStart(2, '0')}s`
 }
 
+// Design: =0 🥀 Somber, 1–50 🍂 Reflective, 51–80 🌱 Cautiously hopeful, >80 🌿 Celebratory
 function getOutcome(health: number) {
   if (health <= 0)  return { icon: '🥀', color: '#ef4444', title: 'The plant has wilted.',
     body: 'The weight of unfiltered cruelty was too much. Online violence destroys even the most resilient life.' }

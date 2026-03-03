@@ -15,10 +15,13 @@ export interface ActiveWordData {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_WORDS_ON_SCREEN = 10
-const SPAWN_INTERVAL_START = 2200  // ms between spawns at start
-const SPAWN_INTERVAL_MIN   = 650   // ms at max speed
+const MAX_WORDS_ON_SCREEN = 6
+const SPAWN_INTERVAL_START = 3200  // ms between spawns at start — less crowded
+const SPAWN_INTERVAL_MIN   = 900   // ms at max speed
 const RAMP_SECONDS         = 200   // time (s) to reach max speed
+const SPAWN_X_MIN = -7.2
+const SPAWN_X_MAX = 7.2
+const SPAWN_INTERVAL_JITTER = 600  // ±ms so spawns don't align in a line
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -28,10 +31,10 @@ export function useWordGame(comments: Comment[], isPlaying: boolean) {
   const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startTimeRef = useRef(0)
 
-  // Current fall speed — read by FallingWord3D via prop
+  // Constant fall speed — all words drop at the same rate
   const getFallSpeed = useCallback((elapsedMs: number): number => {
-    const t = Math.min(1, elapsedMs / 1000 / RAMP_SECONDS)
-    return 1.4 + t * 2.8 // 1.4 → 4.2 world-units/second
+    void elapsedMs
+    return 0.9
   }, [])
 
   const getSpawnInterval = (elapsedMs: number): number => {
@@ -52,12 +55,13 @@ export function useWordGame(comments: Comment[], isPlaying: boolean) {
 
     const scheduleNext = () => {
       const elapsed = Date.now() - startTimeRef.current
-      const interval = getSpawnInterval(elapsed)
+      const baseInterval = getSpawnInterval(elapsed)
+      const jitter = (Math.random() - 0.5) * SPAWN_INTERVAL_JITTER
+      const interval = Math.max(400, baseInterval + jitter)
 
       timerRef.current = setTimeout(() => {
         setWords(prev => {
           if (prev.length >= MAX_WORDS_ON_SCREEN) {
-            // skip this tick, retry sooner
             scheduleNext()
             return prev
           }
@@ -70,7 +74,7 @@ export function useWordGame(comments: Comment[], isPlaying: boolean) {
             category: comment.category,
             severity: comment.severity,
             language: comment.language,
-            spawnX: (Math.random() - 0.5) * 11,  // -5.5 … +5.5
+            spawnX: SPAWN_X_MIN + Math.random() * (SPAWN_X_MAX - SPAWN_X_MIN),
             spawnTime: Date.now(),
           }
           scheduleNext()

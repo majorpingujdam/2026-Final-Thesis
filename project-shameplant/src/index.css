@@ -20,7 +20,7 @@ html, body, #root {
 }
 
 body {
-  background: #060008;
+  background: #050008; /* Design: near-black purple-black */
   color: rgba(255, 255, 255, 0.88);
   touch-action: none; /* Required for touch-wall installations */
 }

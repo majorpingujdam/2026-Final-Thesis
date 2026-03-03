@@ -52,20 +52,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
     case 'FEED_PLANT': {
-      // Swipe right on a positive comment → nourish plant
-      const gain = Math.max(0, action.severity) * 1.5
+      // Positive word reaches plant → nourish (Design: +severity × 1.6, stress −4)
+      const gain = Math.max(0, action.severity) * 1.6
       const newHealth = Math.min(100, state.health + gain)
       return {
         ...state,
         health: newHealth,
-        stress: Math.max(0, state.stress - 3),
+        stress: Math.max(0, state.stress - 4),
         commentsFed: state.commentsFed + 1,
       }
     }
 
     case 'FILTER_COMMENT': {
-      // Swipe left on a negative comment → protect plant, small stress cost
-      const stressIncrease = Math.abs(action.severity) * 0.6
+      // Negative word thrown off → filter success, stress cost (Design: +severity × 0.55)
+      const stressIncrease = Math.abs(action.severity) * 0.55
       return {
         ...state,
         stress: Math.min(100, state.stress + stressIncrease),
@@ -74,10 +74,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'COMMENT_IGNORED': {
-      // Negative comment ignored → hits the plant
-      const damage = Math.abs(action.severity) * 1.2
+      // Negative word hits plant → damage (Design: −severity × 1.3, stress +severity × 0.45)
+      const damage = Math.abs(action.severity) * 1.3
       const newHealth = Math.max(0, state.health - damage)
-      const stressDamage = Math.abs(action.severity) * 0.5
+      const stressDamage = Math.abs(action.severity) * 0.45
       const ended = newHealth <= 0
 
       return {

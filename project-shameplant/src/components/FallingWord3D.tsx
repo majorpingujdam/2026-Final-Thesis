@@ -7,23 +7,24 @@ import { CommentCategory } from '../types'
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const FONT_URL  = '/fonts/helvetiker_bold.typeface.json'
-const GRAVITY   = 1.2   // world-units / s²  — acceleration added to fall
+const GRAVITY   = 0.5   // gentle fall, not game-like
 const EXIT_X    = 8.5   // side exit threshold
 const BOTTOM_Y  = -6.2  // floor exit threshold
 const SPAWN_Y   = 7.5   // words enter from this Y
 
+// Only two word colors: blue (support) and red (harm)
 const CATEGORY_COLOR: Record<CommentCategory, string> = {
-  positive: '#4ade80',
-  neutral:  '#22d3ee',
-  negative: '#fb923c',
-  severe:   '#f43f5e',
+  positive: '#22d3ee', // blue
+  neutral:  '#22d3ee', // blue
+  negative: '#f43f5e', // red
+  severe:   '#f43f5e', // red
 }
 
-const CATEGORY_EMISSIVE: Record<CommentCategory, number> = {
-  positive: 0.45,
-  neutral:  0.35,
-  negative: 0.5,
-  severe:   0.65,
+// Design: emissiveIntensity 0.35–0.65 severity-dependent; base by polarity, then scale by |severity|/10
+function getEmissiveIntensity(category: CommentCategory, severity: number): number {
+  const base = { positive: 0.45, neutral: 0.45, negative: 0.55, severe: 0.55 }[category]
+  const severityFactor = (Math.min(10, Math.abs(severity)) / 10) * 0.23
+  return THREE.MathUtils.clamp(base + severityFactor, 0.35, 0.65)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ interface FallingWordProps {
   instanceId: string
   text: string
   category: CommentCategory
+  severity: number   // for emissive intensity (Design: 0.35–0.65 severity-dependent)
   spawnX: number
   fallSpeed: number  // current game speed in world-units/s
   onExit: (id: string, hitBottom: boolean) => void
@@ -40,7 +42,7 @@ interface FallingWordProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function FallingWord3D({
-  instanceId, text, category, spawnX, fallSpeed, onExit,
+  instanceId, text, category, severity, spawnX, fallSpeed, onExit,
 }: FallingWordProps) {
 
   const groupRef  = useRef<THREE.Group>(null)
@@ -66,7 +68,7 @@ export function FallingWord3D({
   }, [camera, size])
 
   const color    = CATEGORY_COLOR[category]
-  const emissive = CATEGORY_EMISSIVE[category]
+  const emissive = getEmissiveIntensity(category, severity)
 
   // ── Physics loop ────────────────────────────────────────────────────────────
 
@@ -74,7 +76,7 @@ export function FallingWord3D({
     if (!groupRef.current || exited.current) return
 
     if (!dragging.current) {
-      velRef.current.y = Math.max(-10, velRef.current.y - GRAVITY * delta)
+      velRef.current.y = Math.max(-4, velRef.current.y - GRAVITY * delta)
       velRef.current.x *= Math.pow(0.85, delta * 10) // horizontal damping
       posRef.current.x += velRef.current.x * delta
       posRef.current.y += velRef.current.y * delta
@@ -157,12 +159,12 @@ export function FallingWord3D({
       <Center>
         <Text3D
           font={FONT_URL}
-          size={0.44}
-          height={0.22}       // extrusion depth
+          size={0.28}
+          height={0.12}       // extrusion depth — smaller
           curveSegments={2}   // LOW POLY — very angular curves
           bevelEnabled
-          bevelThickness={0.05}
-          bevelSize={0.03}
+          bevelThickness={0.03}
+          bevelSize={0.02}
           bevelSegments={1}   // sharp bevel edges = low poly
           onPointerDown={handlePointerDown as unknown as (e: THREE.Event) => void}
         >
@@ -179,8 +181,8 @@ export function FallingWord3D({
       </Center>
 
       {/* Glow halo ring behind the word */}
-      <mesh position={[0, 0, -0.18]} rotation={[0, 0, 0]}>
-        <planeGeometry args={[3.2, 0.7]} />
+      <mesh position={[0, 0, -0.12]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[2, 0.45]} />
         <meshBasicMaterial
           color={color}
           transparent
