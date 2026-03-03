@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global resets ──────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: #060008;
+  color: rgba(255, 255, 255, 0.88);
+  touch-action: none; /* Required for touch-wall installations */
+}
+
+/* ─── Scrollbar hide ─────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* ─── Selection ──────────────────────────────────────────────────────────── */
+
+::selection {
+  background: rgba(74, 222, 128, 0.3);
+  color: #fff;
+}
+
+/* ─── Canvas fill ────────────────────────────────────────────────────────── */
+
+canvas {
+  display: block;
+  outline: none;
+}
+
+/* ─── Touch / pointer improvements ──────────────────────────────────────── */
+
+button, [draggable] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
