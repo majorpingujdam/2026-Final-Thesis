@@ -3,7 +3,22 @@ import { GameState, GameAction } from '../types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SESSION_MAX_SECONDS = 300 // 5 minutes hard cap
+const SESSION_MAX_SECONDS = 300  // 5-minute hard cap
+const RAMP_SECONDS        = 200  // time to reach max speed level
+
+// ─── Score / level helpers ────────────────────────────────────────────────────
+
+export function calcScore(state: GameState): number {
+  const fed      = state.commentsFed      * 150
+  const filtered = state.commentsFiltered * 80
+  const penalty  = state.commentsIgnored  * 60
+  const bonus    = Math.round(state.health) * 10
+  return Math.max(0, fed + filtered - penalty + bonus)
+}
+
+export function calcLevel(elapsedSeconds: number): number {
+  return Math.min(10, 1 + Math.floor((elapsedSeconds / RAMP_SECONDS) * 9))
+}
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -114,16 +129,14 @@ export function useGameState() {
 
   const shouldAutoEnd = state.phase === 'playing' && elapsedSeconds >= SESSION_MAX_SECONDS
 
+  const score = calcScore(state)
+  const level = calcLevel(elapsedSeconds)
+
   return {
-    state,
-    elapsedSeconds,
-    shouldAutoEnd,
-    startGame,
-    endGame,
-    resetGame,
-    feedPlant,
-    filterComment,
-    commentIgnored,
+    state, score, level,
+    elapsedSeconds, shouldAutoEnd,
+    startGame, endGame, resetGame,
+    feedPlant, filterComment, commentIgnored,
     dispatch,
   }
 }

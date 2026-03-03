@@ -1,74 +1,104 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { MimosaScene } from './components/MimosaScene'
-import { CommentStream } from './components/CommentStream'
-import { HealthBar } from './components/HealthBar'
-import { StatsPanel } from './components/StatsPanel'
-import { IntroScreen } from './components/IntroScreen'
-import { EndScreen } from './components/EndScreen'
+import { GameScene }    from './components/GameScene'
+import { HUD }          from './components/HUD'
+import { IntroScreen }  from './components/IntroScreen'
+import { EndScreen }    from './components/EndScreen'
 import { useGameState } from './hooks/useGameState'
-import { COMMENTS, getShuffledComments } from './data/comments'
+import { useWordGame }  from './hooks/useWordGame'
+import { COMMENTS }     from './data/comments'
 
-// ─── Comment pool (shuffled once) ─────────────────────────────────────────────
+// ─── Filter to English-only comments for 3D text (font supports Latin only) ──
+const EN_COMMENTS = COMMENTS.filter(c => c.language === 'en')
 
-const SHUFFLED_COMMENTS = getShuffledComments()
-
-// ─── Layout constants ─────────────────────────────────────────────────────────
-
-const BOTTOM_BAR_HEIGHT = 72
-const STREAM_CONTAINER_HEIGHT_VH = 100 // percentage
-
-// ─── Main App ─────────────────────────────────────────────────────────────────
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { state, elapsedSeconds, shouldAutoEnd, startGame, endGame, resetGame, feedPlant, filterComment, commentIgnored } = useGameState()
+  const {
+    state, score, level, elapsedSeconds, shouldAutoEnd,
+    startGame, endGame, resetGame,
+    feedPlant, filterComment, commentIgnored,
+  } = useGameState()
 
-  const streamContainerRef = useRef<HTMLDivElement>(null)
-  const containerHeightRef = useRef(600)
+  const isPlaying = state.phase === 'playing'
 
-  // ── Measure stream container height ────────────────────────────────────────
-  useEffect(() => {
-    const measure = () => {
-      if (streamContainerRef.current) {
-        containerHeightRef.current = streamContainerRef.current.clientHeight
-      }
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
+  // ── Word game ──────────────────────────────────────────────────────────────
+  const { words, removeWord, getFallSpeed, startTimeRef } = useWordGame(EN_COMMENTS, isPlaying)
 
-  // ── Auto-end when time runs out ─────────────────────────────────────────────
+  const fallSpeed = isPlaying
+    ? getFallSpeed(Date.now() - startTimeRef.current)
+    : 1.5
+
+  // ── Auto-end ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (shouldAutoEnd) endGame()
   }, [shouldAutoEnd, endGame])
 
-  // ── Comment handlers ────────────────────────────────────────────────────────
-  const handleFeed    = useCallback((s: number) => feedPlant(s), [feedPlant])
-  const handleFilter  = useCallback((s: number) => filterComment(s), [filterComment])
-  const handleIgnored = useCallback((s: number) => commentIgnored(s), [commentIgnored])
+  // ── Word exit handler ──────────────────────────────────────────────────────
+  // hitBottom=true  → word reached bottom of field
+  // hitBottom=false → word was thrown off the sides
+  const handleWordExit = useCallback((id: string, hitBottom: boolean) => {
+    const word = words.find(w => w.instanceId === id)
+    if (!word) return
 
-  const isPlaying = state.phase === 'playing'
+    if (hitBottom) {
+      if (word.category === 'positive' || word.category === 'neutral') {
+        // Good: positive word reached the plant naturally
+        feedPlant(word.severity)
+      } else {
+        // Bad: negative/severe word hit the plant
+        commentIgnored(word.severity)
+      }
+    } else {
+      // Thrown off screen
+      if (word.category === 'negative' || word.category === 'severe') {
+        // Correctly blocked a bad word
+        filterComment(word.severity)
+      }
+      // Throwing a positive off screen: no special effect (just missed)
+    }
+
+    removeWord(id)
+  }, [words, feedPlant, commentIgnored, filterComment, removeWord])
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'radial-gradient(ellipse at 20% 80%, #1a0010 0%, #08000f 45%, #000508 100%)',
-      overflow: 'hidden',
-      position: 'relative',
-    }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: '#050008' }}>
 
-      {/* ── Intro overlay ── */}
+      {/* ── Full-screen 3D game (always rendered, visible behind overlays) ── */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <GameScene
+          health={state.health}
+          stress={state.stress}
+          words={words}
+          fallSpeed={fallSpeed}
+          onWordExit={handleWordExit}
+        />
+      </div>
+
+      {/* ── HUD overlay (only while playing) ── */}
+      {isPlaying && (
+        <HUD
+          health={state.health}
+          stress={state.stress}
+          score={score}
+          level={level}
+          wordsCaught={state.commentsFed}
+          wordsFiltered={state.commentsFiltered}
+          wordsHit={state.commentsIgnored}
+          elapsedSeconds={elapsedSeconds}
+          onEnd={endGame}
+        />
+      )}
+
+      {/* ── Intro screen ── */}
       <AnimatePresence>
         {state.phase === 'intro' && (
           <motion.div
             key="intro"
             initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
             style={{ position: 'absolute', inset: 0, zIndex: 50 }}
           >
             <IntroScreen onStart={startGame} />
@@ -76,7 +106,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── End overlay ── */}
+      {/* ── End screen ── */}
       <AnimatePresence>
         {state.phase === 'ended' && (
           <motion.div
@@ -91,177 +121,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Main game layout ── */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        minHeight: 0,
-        paddingBottom: BOTTOM_BAR_HEIGHT,
-      }}>
-
-        {/* LEFT PANEL — 3D scene (40%) */}
-        <div style={{
-          width: '40%',
-          position: 'relative',
-          flexShrink: 0,
-          borderRight: '1px solid rgba(255,255,255,0.04)',
-        }}>
-          {/* Ambient fog gradient on left edge */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(ellipse at 50% 60%, transparent 40%, rgba(8,0,16,0.6) 100%)',
-            pointerEvents: 'none',
-            zIndex: 1,
-          }} />
-          <MimosaScene health={state.health} stress={state.stress} />
-
-          {/* Health pulse indicator at low health */}
-          {state.health < 25 && isPlaying && (
-            <motion.div
-              animate={{ opacity: [0, 0.15, 0] }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: '#ef4444',
-                pointerEvents: 'none',
-                zIndex: 2,
-              }}
-            />
-          )}
-        </div>
-
-        {/* RIGHT PANEL — Comment stream (60%) */}
-        <div
-          ref={streamContainerRef}
-          style={{
-            flex: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {/* Panel header */}
-          <div style={{
-            padding: '16px 24px 12px',
-            borderBottom: '1px solid rgba(255,255,255,0.04)',
-            flexShrink: 0,
-          }}>
-            <p style={{
-              fontSize: '0.65rem',
-              letterSpacing: '0.14em',
-              color: 'rgba(255,255,255,0.2)',
-              textTransform: 'uppercase',
-            }}>
-              实时评论流 · Live Comment Feed
-            </p>
-          </div>
-
-          {/* Instruction chips */}
-          {isPlaying && (
-            <div style={{
-              padding: '8px 24px',
-              display: 'flex',
-              gap: 8,
-              flexShrink: 0,
-            }}>
-              {[
-                { label: '← 过滤负向', color: '#60a5fa' },
-                { label: '正向 →',     color: '#4ade80' },
-              ].map(({ label, color }) => (
-                <div key={label} style={{
-                  padding: '4px 12px',
-                  borderRadius: 20,
-                  border: `1px solid ${color}40`,
-                  background: `${color}10`,
-                  fontSize: '0.65rem',
-                  color: `${color}cc`,
-                  letterSpacing: '0.06em',
-                }}>
-                  {label}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Scrolling comment area */}
-          <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-            <CommentStream
-              comments={SHUFFLED_COMMENTS}
-              isPlaying={isPlaying}
-              containerHeight={containerHeightRef.current}
-              onFeed={handleFeed}
-              onFilter={handleFilter}
-              onIgnored={handleIgnored}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Bottom bar ── */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: BOTTOM_BAR_HEIGHT,
-        background: 'rgba(8, 0, 16, 0.92)',
-        backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 24px',
-        gap: 32,
-        zIndex: 20,
-      }}>
-        <HealthBar health={state.health} stress={state.stress} />
-        <div style={{
-          width: 1,
-          height: 36,
-          background: 'rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }} />
-        <StatsPanel
-          commentsFiltered={state.commentsFiltered}
-          commentsFed={state.commentsFed}
-          commentsIgnored={state.commentsIgnored}
-          elapsedSeconds={elapsedSeconds}
-        />
-
-        {/* End session button */}
-        {isPlaying && (
-          <button
-            onClick={endGame}
-            style={{
-              marginLeft: 'auto',
-              padding: '6px 16px',
-              fontSize: '0.65rem',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.3)',
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 20,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              flexShrink: 0,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)'
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.3)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)'
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'
-            }}
-          >
-            结束 · End
-          </button>
-        )}
-      </div>
     </div>
   )
 }

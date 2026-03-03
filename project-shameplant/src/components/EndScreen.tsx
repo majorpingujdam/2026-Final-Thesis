@@ -1,118 +1,91 @@
 import { motion } from 'framer-motion'
 import { GameState } from '../types'
+import { calcScore } from '../hooks/useGameState'
 
 interface EndScreenProps {
   state: GameState
   onRestart: () => void
 }
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}分${s.toString().padStart(2, '0')}秒`
+function formatTime(s: number): string {
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}m ${sec.toString().padStart(2, '0')}s`
 }
 
-function getOutcomeMessage(health: number, filtered: number, fed: number): {
-  zh: string; en: string; color: string; icon: string
-} {
-  if (health <= 0) {
-    return {
-      zh: '植物已枯萎。网络暴力摧毁了最敏感的生命。',
-      en: 'The plant has wilted. Online violence destroys even the most sensitive life.',
-      color: '#ef4444',
-      icon: '🥀',
-    }
-  }
-  if (health > 80) {
-    return {
-      zh: '植物茁壮成长！你的守护让它充满活力。',
-      en: 'The plant thrives! Your protection filled it with vitality.',
-      color: '#4ade80',
-      icon: '🌿',
-    }
-  }
-  if (health > 50) {
-    return {
-      zh: '植物还活着，但伤痕累累。每一条评论都留下了痕迹。',
-      en: 'The plant survives, but scarred. Every comment left its mark.',
-      color: '#facc15',
-      icon: '🌱',
-    }
-  }
-  return {
-    zh: '植物在挣扎。善意的关怀永远不嫌多。',
-    en: 'The plant is struggling. Kindness is never enough.',
-    color: '#f97316',
-    icon: '🍂',
-  }
+function getOutcome(health: number) {
+  if (health <= 0)  return { icon: '🥀', color: '#ef4444', title: 'The plant has wilted.',
+    body: 'The weight of unfiltered cruelty was too much. Online violence destroys even the most resilient life.' }
+  if (health > 80)  return { icon: '🌿', color: '#4ade80', title: 'The plant thrives!',
+    body: 'Your protection made all the difference. Kindness is a shield that actually works.' }
+  if (health > 50)  return { icon: '🌱', color: '#facc15', title: 'The plant survived — barely.',
+    body: 'Scarred but standing. Every negative word that slipped through left its mark.' }
+  return { icon: '🍂', color: '#f97316', title: 'The plant is struggling.',
+    body: 'There\'s always more harmful content than we expect. Vigilance matters.' }
 }
 
 export function EndScreen({ state, onRestart }: EndScreenProps) {
   const { health, commentsFiltered, commentsFed, commentsIgnored, sessionDuration } = state
-  const outcome = getOutcomeMessage(health, commentsFiltered, commentsFed)
-  const total = commentsFiltered + commentsFed + commentsIgnored
+  const outcome  = getOutcome(health)
+  const total    = commentsFed + commentsFiltered + commentsIgnored
+  const score    = calcScore(state)
+  const accuracy = total > 0
+    ? Math.round(((commentsFed + commentsFiltered) / total) * 100)
+    : 0
 
   return (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'radial-gradient(ellipse at 50% 50%, #0d0010 0%, #060008 60%, #000000 100%)',
-      zIndex: 100,
+      position: 'fixed', inset: 0, zIndex: 100,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)',
     }}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        initial={{ opacity: 0, scale: 0.9, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         style={{
-          maxWidth: 560,
-          width: '90%',
-          padding: '44px 40px',
-          background: 'rgba(255,255,255,0.03)',
+          maxWidth: 540, width: '92%',
+          background: 'rgba(10, 0, 20, 0.95)',
           backdropFilter: 'blur(24px)',
-          borderRadius: 24,
-          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 22,
+          border: `1px solid ${outcome.color}30`,
           boxShadow: `0 0 60px ${outcome.color}15`,
+          padding: '40px 36px',
+          textAlign: 'center',
         }}
       >
-        {/* Outcome icon + message */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <motion.div
-            animate={{ scale: [1, 1.08, 1] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ fontSize: '3rem', marginBottom: 16 }}
-          >
-            {outcome.icon}
-          </motion.div>
-          <h2 style={{
-            margin: '0 0 12px',
-            fontSize: '1.4rem',
-            fontWeight: 300,
-            letterSpacing: '0.12em',
-            color: outcome.color,
-          }}>
-            {outcome.zh}
-          </h2>
-          <p style={{
-            margin: 0,
-            fontSize: '0.8rem',
-            color: 'rgba(255,255,255,0.35)',
-            lineHeight: 1.6,
-            fontStyle: 'italic',
-          }}>
-            {outcome.en}
-          </p>
+        {/* Outcome */}
+        <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2.5, repeat: Infinity }}>
+          <span style={{ fontSize: '3rem' }}>{outcome.icon}</span>
+        </motion.div>
+
+        <h2 style={{ margin: '14px 0 8px', fontSize: '1.4rem', fontWeight: 300,
+          letterSpacing: '0.06em', color: outcome.color }}>
+          {outcome.title}
+        </h2>
+        <p style={{ margin: '0 0 28px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.38)',
+          lineHeight: 1.7, fontStyle: 'italic' }}>
+          {outcome.body}
+        </p>
+
+        {/* Score */}
+        <div style={{ margin: '0 0 24px' }}>
+          <div style={{ fontSize: '3rem', fontWeight: 800, color: '#facc15',
+            letterSpacing: '-0.02em', lineHeight: 1 }}>
+            {score.toLocaleString()}
+          </div>
+          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)',
+            letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 4 }}>
+            Final Score
+          </div>
         </div>
 
-        {/* Final health bar */}
-        <div style={{ marginBottom: 28 }}>
+        {/* Health bar */}
+        <div style={{ margin: '0 0 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              最终生命值
-            </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: outcome.color }}>
+            <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)',
+              letterSpacing: '0.1em', textTransform: 'uppercase' }}>Final Plant Health</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: outcome.color }}>
               {Math.round(health)}%
             </span>
           </div>
@@ -120,111 +93,69 @@ export function EndScreen({ state, onRestart }: EndScreenProps) {
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${health}%` }}
-              transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.4 }}
               style={{
-                height: '100%',
-                background: `linear-gradient(90deg, ${outcome.color}80, ${outcome.color})`,
+                height: '100%', borderRadius: 4,
+                background: `linear-gradient(90deg, ${outcome.color}60, ${outcome.color})`,
                 boxShadow: `0 0 10px ${outcome.color}60`,
-                borderRadius: 4,
               }}
             />
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 12,
-          marginBottom: 32,
-        }}>
+        {/* Stat grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 28 }}>
           {[
-            { label: '坚持时长', value: formatTime(sessionDuration), color: 'rgba(255,255,255,0.6)' },
-            { label: '总评论数', value: total, color: 'rgba(255,255,255,0.6)' },
-            { label: '喂养次数', value: commentsFed, color: '#4ade80', sub: '正向评论接受' },
-            { label: '过滤次数', value: commentsFiltered, color: '#60a5fa', sub: '负向评论屏蔽' },
-            { label: '植物受击', value: commentsIgnored, color: '#ef4444', sub: '未处理的伤害' },
-            {
-              label: '保护率',
-              value: total > 0
-                ? `${Math.round(((commentsFed + commentsFiltered) / total) * 100)}%`
-                : '—',
-              color: '#a78bfa',
-            },
-          ].map(({ label, value, color, sub }) => (
+            { label: 'Time Survived',   value: formatTime(sessionDuration), color: 'rgba(255,255,255,0.55)' },
+            { label: 'Words Fed',        value: commentsFed,      color: '#4ade80' },
+            { label: 'Words Blocked',    value: commentsFiltered, color: '#60a5fa' },
+            { label: 'Plant Hits',       value: commentsIgnored,  color: '#ef4444' },
+            { label: 'Total Words',      value: total,            color: 'rgba(255,255,255,0.4)' },
+            { label: 'Protection Rate',  value: `${accuracy}%`,  color: '#a78bfa' },
+          ].map(({ label, value, color }) => (
             <div key={label} style={{
-              padding: '14px 16px',
-              background: 'rgba(255,255,255,0.04)',
-              borderRadius: 10,
+              padding: '12px 10px',
+              background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 10,
             }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color, lineHeight: 1 }}>
-                {value}
-              </div>
-              <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: 4, letterSpacing: '0.06em' }}>
-                {label}
-              </div>
-              {sub && (
-                <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>
-                  {sub}
-                </div>
-              )}
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: '0.57rem', color: 'rgba(255,255,255,0.28)',
+                marginTop: 4, letterSpacing: '0.06em', lineHeight: 1.3 }}>{label}</div>
             </div>
           ))}
         </div>
 
-        {/* Reflection note */}
+        {/* Reflection */}
         <div style={{
-          padding: '14px 18px',
+          padding: '14px 18px', marginBottom: 28,
           background: 'rgba(255,255,255,0.02)',
           border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: 10,
-          marginBottom: 28,
-          textAlign: 'center',
         }}>
-          <p style={{
-            margin: 0,
-            fontSize: '0.78rem',
-            color: 'rgba(255,255,255,0.4)',
-            lineHeight: 1.7,
-            fontStyle: 'italic',
-          }}>
-            "网络暴力不只是文字。它像含羞草一样，
-            让人慢慢地、无声地合拢。"
-          </p>
-          <p style={{
-            margin: '6px 0 0',
-            fontSize: '0.65rem',
-            color: 'rgba(255,255,255,0.2)',
-          }}>
-            "Cyberbullying isn't just words. Like a Mimosa,
-            it makes people slowly, silently close."
+          <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(255,255,255,0.38)',
+            lineHeight: 1.7, fontStyle: 'italic' }}>
+            "Like a Mimosa pudica, people close themselves when hurt —
+            slowly, silently, to protect what little remains."
           </p>
         </div>
 
-        {/* Restart button */}
-        <div style={{ textAlign: 'center' }}>
-          <motion.button
-            onClick={onRestart}
-            whileHover={{ scale: 1.04, boxShadow: '0 0 24px rgba(255,255,255,0.12)' }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              padding: '12px 40px',
-              fontSize: '0.9rem',
-              fontWeight: 500,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.8)',
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 50,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            再来一次 · Play Again
-          </motion.button>
-        </div>
+        {/* Restart */}
+        <motion.button
+          onClick={onRestart}
+          whileHover={{ scale: 1.04, boxShadow: '0 0 28px rgba(255,255,255,0.12)' }}
+          whileTap={{ scale: 0.97 }}
+          style={{
+            padding: '12px 40px', fontSize: '0.85rem', fontWeight: 600,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.75)',
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 50, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Play Again
+        </motion.button>
       </motion.div>
     </div>
   )
